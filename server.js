@@ -17,12 +17,46 @@ app.set("view engine", "pug")
 app.use(express.static("public"))
 
 app.get("/", (req, res) => res.render("index"))
+mongoose.Promise = Promise
 
 mongoose.connect(MONGODB_URL, () => {
   server.listen(PORT, () => console.log(`Server listening on port: ${PORT}`))
 })
 
-io.on('connected', socket => {          //individual socket mapped to sockets
+
+// ///////////////////////////  Setup for BACKEND  ///////////////////////////
+const Game = mongoose.model("game", {
+  board: [
+  [String, String,String],
+  [String, String,String],
+  [String, String,String],
+  ]
+})
+
+io.on('connect', socket => {          //individual socket generated & mapped to sockets 
+  Game.create({
+    board: [['','',''],['','',''],['','','']]
+  })
+  .then(g => {
+    socket.game = g
+    socket.emit('new game', g)
+  })
+  .catch(err => {
+    socket.emit('error', err)
+    console.error(err)
+  })
+
+// takes "socket.emit ("make move"), {row, col}" from main.js as move ("move" destructured is {row, col})
+socket.on('make move', ({ row, col }) => {
+    socket.game.board[row][col] = '💩'
+    socket.game.markModified('board')     // trigger mongoose change detection
+    socket.game.save().then(g => socket.emit('move made', socket.game))
+  })
+
+
   console.log(`Socket connected: ${socket.id}`)
   socket.on('disconnect', () => console.log(`Socket disconnected: ${socket.id}`))
 })
+
+
+
