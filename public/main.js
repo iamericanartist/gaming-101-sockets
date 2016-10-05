@@ -6,10 +6,17 @@ const board = document.querySelector('.board')
 const status = document.querySelector('.status')
 
 const renderStatus = game => {
-  status.innerText = game.result
-    ? `${game.result} WON!`
-    : `${game.toMove}'s Turn`
+  if (game.result === 'Tie') {
+    return status.innerText = "It's a tie!"
+  }
+
+  if (game.result) {
+    return status.innerText = `${game.result} WON!`
+  }
+
+  status.innerText = `${game.toMove}'s Turn`
 }
+
 
 const renderBoard = game => {
   const b = game.board
