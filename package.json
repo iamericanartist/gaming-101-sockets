@@ -1,0 +1,26 @@
+{
+  "name": "gaming-101-sockets",
+  "version": "1.0.0",
+  "description": "Node Database Driven Application / Web Sockets / Gaming 101",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iamericanartist/gaming-101-sockets.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/iamericanartist/gaming-101-sockets/issues"
+  },
+  "homepage": "https://github.com/iamericanartist/gaming-101-sockets#readme",
+  "dependencies": {
+    "express": "^4.14.0",
+    "mongoose": "^4.6.2",
+    "pug": "^2.0.0-beta6",
+    "socket.io": "^1.4.8"
+  }
+}
