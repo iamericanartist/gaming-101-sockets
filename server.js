@@ -22,20 +22,23 @@ mongoose.Promise = Promise
 mongoose.connect(MONGODB_URL, () => {
   server.listen(PORT, () => console.log(`Server listening on port: ${PORT}`))
 })
-
+///////////////////////////  BASIC SERVER SETUP ABOVE  ///////////////////////////
 
 // ///////////////////////////  Setup for BACKEND  ///////////////////////////
-const Game = mongoose.model("game", {
+const Game = mongoose.model('game', {
   board: [
-  [String, String,String],
-  [String, String,String],
-  [String, String,String],
-  ]
+    [String, String, String],
+    [String, String, String],
+    [String, String, String],
+  ],
+  toMove: String,
+  result: String,
 })
 
-io.on('connect', socket => {          //individual socket generated & mapped to sockets 
+io.on('connect', socket => {
   Game.create({
-    board: [['','',''],['','',''],['','','']]
+    board: [['','',''],['','',''],['','','']],
+    toMove: 'X',
   })
   .then(g => {
     socket.game = g
@@ -46,17 +49,79 @@ io.on('connect', socket => {          //individual socket generated & mapped to 
     console.error(err)
   })
 
-// takes "socket.emit ("make move"), {row, col}" from main.js as move ("move" destructured is {row, col})
-socket.on('make move', ({ row, col }) => {
-    socket.game.board[row][col] = '💩'
-    socket.game.markModified('board')     // trigger mongoose change detection
-    socket.game.save().then(g => socket.emit('move made', socket.game))
-  })
+  socket.on('make move', ({ row, col }) => {
+    if (socket.game.result) {
+      return
+    }
 
+    if (socket.game.board[row][col]) {
+      return
+    }
+
+    socket.game.board[row][col] = socket.game.toMove
+    socket.game.toMove = socket.game.toMove === 'X' ? 'O' : 'X'
+    socket.game.markModified('board') // trigger mongoose change detection
+
+    const result = winner(socket.game.board)
+
+    if (result) {
+      socket.game.toMove = undefined // mongoose equivalent to: delete socket.game.toMove
+      socket.game.result = result
+    }
+
+    socket.game.save().then(g => socket.emit('move made', g))
+  })
 
   console.log(`Socket connected: ${socket.id}`)
   socket.on('disconnect', () => console.log(`Socket disconnected: ${socket.id}`))
 })
 
 
+
+
+
+
+
+
+const winner = b => {
+  // Rows
+  if (b[0][0] && b[0][0] === b[0][1] && b[0][1] === b[0][2]) {
+    return b[0][0]
+  }
+
+  if (b[1][0] && b[1][0] === b[1][1] && b[1][1] === b[1][2]) {
+    return b[1][0]
+  }
+
+  if (b[2][0] && b[2][0] === b[2][1] && b[2][1] === b[2][2]) {
+    return b[2][0]
+  }
+
+  // Cols
+  if (b[0][0] && b[0][0] === b[1][0] && b[1][0] === b[2][0]) {
+    return b[0][0]
+  }
+
+  if (b[0][1] && b[0][1] === b[1][1] && b[1][1] === b[2][1]) {
+    return b[0][1]
+  }
+
+  if (b[0][2] && b[0][2] === b[1][2] && b[1][2] === b[2][2]) {
+    return b[0][2]
+  }
+
+  // Diags
+  if (b[0][0] && b[0][0] === b[1][1] && b[1][1] === b[2][2]) {
+    return b[0][0]
+  }
+
+  if (b[0][2] && b[0][2] === b[1][1] && b[1][1] === b[2][0]) {
+    return b[0][2]
+  }
+
+  // Tie or In-Progress
+  else {
+    return null
+  }
+}
 
