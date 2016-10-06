@@ -1,5 +1,6 @@
 "use strict"
 
+/////////////////////////////  BASIC SERVER SETUP  /////////////////////////////
 const express = require("express")
 const { Server } = require("http")
 const mongoose = require("mongoose")
@@ -29,16 +30,16 @@ app.get('/game/create', (req, res) => {
   })
   .then(game => res.redirect(`/game/${game._id}`))
 })
-
-app.get('/game/:id', (req, res) => res.render('game'))
+app.get('/game/:id', (req, res) => {
+  res.render('game')
+})
 
 mongoose.Promise = Promise
 mongoose.connect(MONGODB_URL, () => {
   server.listen(PORT, () => console.log(`Server listening on port: ${PORT}`))
 })
-//////////////////////////  BASIC SERVER SETUP ABOVE  //////////////////////////
 
-// ///////////////////////////  Setup for BACKEND  ///////////////////////////
+/////////////////////////////  Setup for BACKEND  //////////////////////////////
 const Game = mongoose.model('game', {
   board: [
     [String, String, String],
@@ -52,10 +53,11 @@ const Game = mongoose.model('game', {
 ////////////////////////////////  SOCKET LOGIC  ////////////////////////////////
 io.on('connect', socket => {
   const id = socket.handshake.headers.referer.split('/').slice(-1)[0]
-
+  // io.of(`/${id}`) // allows connections to the namespace
   Game.findById(id)
   .then(g => {
-    socket.game = g
+    socket.join(g._id)
+    socket.gameId = g._id
     socket.emit('new game', g)
   })
   .catch(err => {
@@ -65,23 +67,27 @@ io.on('connect', socket => {
 
   console.log(`Socket connected: ${socket.id}`)
 
-
   socket.on('make move', move => makeMove(move, socket))
   socket.on('disconnect', () => console.log(`Socket disconnected: ${socket.id}`))
 })
 
 const makeMove = (move, socket) => {
-    if (isFinished(socket.game) || !isSpaceAvailable(socket.game, move)) {
-      return
-    }
+  Game.findById(socket.gameId)
+    .then(game => {
+      if (isFinished(game) || !isSpaceAvailable(game, move)) {
+        return
+      }
 
-    Promise.resolve()
-      .then(() => setMove(socket.game, move))
-      .then(toggleNextMove)
-      .then(setResult)
-      .then(g => g.save())
-      .then(g => socket.emit('move made', g))
+      Promise.resolve()
+        .then(() => setMove(game, move))
+        .then(toggleNextMove)
+        .then(setResult)
+        .then(g => g.save())
+        .then(g => io.to(g._id).emit('move made', g))
+        .catch(console.error)
+    })
 }
+
 const isFinished = game => !!game.result
 const isSpaceAvailable = (game, move) => !game.board[move.row][move.col]
 const setMove = (game, move) => {
@@ -152,8 +158,8 @@ const winner = b => {
 }
 
 const movesRemaining = board => {
-  const POSSIBLE_MOVES = 9        //all caps - never change
-  const movesMade = flatten(board).join('').length   //will change with turns
+  const POSSIBLE_MOVES = 9                              //all caps - never change
+  const movesMade = flatten(board).join('').length      //will change with turns
 
   return POSSIBLE_MOVES - movesMade
 }

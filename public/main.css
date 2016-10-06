@@ -1,12 +1,50 @@
+* {
+  font-family: tahoma;
+}
+
 h1 {
+  margin-top: 100px;
+  font-size: 50px;
   color: green;
+  text-align: center;
+}
+
+.status {
+  text-align: center;
+  font-size: 30px;
+}
+table {
+  border-collapse: collapse;
+  margin: auto;
+
 }
 
 td {
-  font-family: helvetica;
-  border: 1px solid black;
+  color: purple;
+  border: 5px solid grey;
   height: 150px;
   width: 150px;
   font-size: 80px;
   text-align: center;
+  text-shadow: 1px,1px,5px, red;
+  padding: 10px;
+}
+tr:nth-child(odd) {
+  background: rgba(200, 240, 200, .6);
+}
+td:nth-child(odd) {
+  background: rgba(240, 200, 200, .6);
+}
+
+td:hover {
+  background: rgba(120, 220, 120, 0.7);
+}
+
+tbody {
+  background-color: rgba(100, 100, 100, 0.5);
+}
+
+.gameTable{
+  width: 98%;
+  margin: 1%;
 }
