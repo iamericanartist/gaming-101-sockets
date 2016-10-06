@@ -1,5 +1,6 @@
 "use strict"
 
+/////////////////////////////  BASIC SERVER SETUP  /////////////////////////////
 const express = require("express")
 const { Server } = require("http")
 const mongoose = require("mongoose")
@@ -12,17 +13,157 @@ const io = socketio(server)
 const PORT = process.env.PORT || 3000
 const MONGODB_URL =  process.env.MONGODB_URL || "mongodb://localhost:27017/ticktacktoe"
 
-app.set("view engine", "pug")
+app.set('view engine', 'pug')
 
-app.use(express.static("public"))
+app.use(express.static('public'))
 
-app.get("/", (req, res) => res.render("index"))
+app.get('/', (req, res) => res.render('home'))
 
+app.get('/game', (req, res) =>
+  Game.find().then(games => res.render('index', { games }))
+)
+
+app.get('/game/create', (req, res) => {
+  Game.create({
+    board: [['','',''],['','',''],['','','']],
+    toMove: 'X',
+  })
+  .then(game => res.redirect(`/game/${game._id}`))
+})
+app.get('/game/:id', (req, res) => {
+  res.render('game')
+})
+
+mongoose.Promise = Promise
 mongoose.connect(MONGODB_URL, () => {
   server.listen(PORT, () => console.log(`Server listening on port: ${PORT}`))
 })
 
-io.on('connected', socket => {          //individual socket mapped to sockets
+/////////////////////////////  Setup for BACKEND  //////////////////////////////
+const Game = mongoose.model('game', {
+  board: [
+    [String, String, String],
+    [String, String, String],
+    [String, String, String],
+  ],
+  toMove: String,
+  result: String,
+})
+
+////////////////////////////////  SOCKET LOGIC  ////////////////////////////////
+io.on('connect', socket => {
+  const id = socket.handshake.headers.referer.split('/').slice(-1)[0]
+  // io.of(`/${id}`) // allows connections to the namespace
+  Game.findById(id)
+  .then(g => {
+    socket.join(g._id)
+    socket.gameId = g._id
+    socket.emit('new game', g)
+  })
+  .catch(err => {
+    socket.emit('error', err)
+    console.error(err)
+  })
+
   console.log(`Socket connected: ${socket.id}`)
+
+  socket.on('make move', move => makeMove(move, socket))
   socket.on('disconnect', () => console.log(`Socket disconnected: ${socket.id}`))
 })
+
+const makeMove = (move, socket) => {
+  Game.findById(socket.gameId)
+    .then(game => {
+      if (isFinished(game) || !isSpaceAvailable(game, move)) {
+        return
+      }
+
+      Promise.resolve()
+        .then(() => setMove(game, move))
+        .then(toggleNextMove)
+        .then(setResult)
+        .then(g => g.save())
+        .then(g => io.to(g._id).emit('move made', g))
+        .catch(console.error)
+    })
+}
+
+const isFinished = game => !!game.result
+const isSpaceAvailable = (game, move) => !game.board[move.row][move.col]
+const setMove = (game, move) => {
+  game.board[move.row][move.col] = game.toMove
+  game.markModified('board') // trigger mongoose change detection
+  return game
+}
+const toggleNextMove = game => {
+  game.toMove = game.toMove === 'X' ? 'O' : 'X'
+  return game
+}
+const setResult = game => {
+  const result = winner(game.board)
+
+  if (result) {
+    game.toMove = undefined // mongoose equivalent to: `delete socket.game.toMove`
+    game.result = result
+  }
+
+  return game
+}
+
+
+///////////////////////////////  WINNER FUNCTION  ///////////////////////////////
+const winner = b => {
+  // Rows
+  if (b[0][0] && b[0][0] === b[0][1] && b[0][1] === b[0][2]) {
+    return b[0][0]
+  }
+
+  if (b[1][0] && b[1][0] === b[1][1] && b[1][1] === b[1][2]) {
+    return b[1][0]
+  }
+
+  if (b[2][0] && b[2][0] === b[2][1] && b[2][1] === b[2][2]) {
+    return b[2][0]
+  }
+
+  // Cols
+  if (b[0][0] && b[0][0] === b[1][0] && b[1][0] === b[2][0]) {
+    return b[0][0]
+  }
+
+  if (b[0][1] && b[0][1] === b[1][1] && b[1][1] === b[2][1]) {
+    return b[0][1]
+  }
+
+  if (b[0][2] && b[0][2] === b[1][2] && b[1][2] === b[2][2]) {
+    return b[0][2]
+  }
+
+  // Diags
+  if (b[0][0] && b[0][0] === b[1][1] && b[1][1] === b[2][2]) {
+    return b[0][0]
+  }
+
+  if (b[0][2] && b[0][2] === b[1][1] && b[1][1] === b[2][0]) {
+    return b[0][2]
+  }
+
+  // Tie
+  if (!movesRemaining(b)) {
+    return 'Tie'
+  }
+
+  // In-Progress
+  return null
+}
+
+const movesRemaining = board => {
+  const POSSIBLE_MOVES = 9                              //all caps - never change
+  const movesMade = flatten(board).join('').length      //will change with turns
+
+  return POSSIBLE_MOVES - movesMade
+}
+
+const flatten = array => array.reduce((a,b) => a.concat(b))
+
+

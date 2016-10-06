@@ -4,7 +4,9 @@ html
     title Tick Tack Toe
     link(rel='stylesheet', href='/main.css')
   body
-    h1 Tick Tack Toe
-    .board
-    script(src='/socket.io/socket.io.js')
-    script(src='/main.js')
+    h1 Tickie Tackie Toe
+
+    h2 Select a game
+    ul
+      for game in games
+        li: a(href=`/game/${game._id}`) Game: #{game._id}
